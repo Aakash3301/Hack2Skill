@@ -3,79 +3,85 @@ import { MathUtils } from './Utils.js';
 import { Pool } from './core/Pool.js';
 import { InputSystem } from './core/Input.js';
 import { Renderer } from './core/Renderer.js';
+import { SecureStorage } from './core/Storage.js';
+import { AUDIO } from './core/Audio.js';
+import { ParticleSystem } from './core/Particles.js';
 import { PauseCommand, MoveCommand } from './core/Command.js';
 import { Player } from './entities/Player.js';
 import { Enemy } from './entities/Enemy.js';
 
-/**
- * Game Engine
- * Singleton Orchestrator
- */
 export class GameEngine {
     static #instance;
 
-    // State
     #state = 'MENU';
     #score = 0;
+    #displayScore = 0; // For Lerp
     #shadowScore = 0;
     #highScore = 0;
 
-    // Systems
     #renderer;
     #input;
     #enemyPool;
+    #particles;
 
-    // Entities
     #player;
     #enemies = [];
     #fragment = { x: 0, y: 0, active: false };
 
-    // Loops
     #lastTime = 0;
     #moveTimer = 0;
     #spawnTimer = 0;
     #globalTime = 0;
+    #difficulty = 1.0;
+    #shake = 0;
 
     constructor() {
         if (GameEngine.#instance) return GameEngine.#instance;
         GameEngine.#instance = this;
 
-        // Initialize Systems
         this.#renderer = new Renderer('gameCanvas');
         this.#input = new InputSystem();
+        this.#particles = new ParticleSystem();
 
-        // Initialize Entities
         this.#player = new Player();
         this.#enemyPool = new Pool(
             () => new Enemy(),
             (e) => { e.active = true; },
-            20
+            50
         );
 
-        // Bind DOM
-        const startBtn = document.getElementById('start-btn');
-        if (startBtn) startBtn.onclick = () => this.start();
-
+        this.#bindUI();
         this.#loadHighScore();
         this.#updateHUD();
 
-        // Start Loop
         requestAnimationFrame((t) => this.#loop(t));
 
-        console.log("[SYSTEM] GameEngine Initialized (Modular)");
+        console.log("[SYSTEM] GameEngine Initialized (Polished)");
+        AUDIO.init(); // Try init audio context
+    }
+
+    #bindUI() {
+        const startBtn = document.getElementById('start-btn');
+        if (startBtn) {
+            startBtn.onclick = () => {
+                AUDIO.init();
+                this.start();
+            };
+            // Touch handler for mobile start
+            startBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                AUDIO.init();
+                this.start();
+            });
+        }
     }
 
     #loadHighScore() {
-        try {
-            const s = localStorage.getItem('egs_prod_high');
-            if (s) this.#highScore = parseInt(s, 10) ^ CONFIG.SECURITY.SALT;
-        } catch (e) { }
+        this.#highScore = SecureStorage.load(CONFIG.SECURITY.STORAGE_KEY, 0);
     }
 
     #saveHighScore() {
-        try {
-            localStorage.setItem('egs_prod_high', (this.#highScore ^ CONFIG.SECURITY.SALT).toString());
-        } catch (e) { }
+        SecureStorage.save(CONFIG.SECURITY.STORAGE_KEY, this.#highScore);
     }
 
     #addScore(val) {
@@ -96,10 +102,13 @@ export class GameEngine {
     start() {
         this.#state = 'PLAYING';
         this.#score = 0;
+        this.#displayScore = 0;
         this.#shadowScore = (0 ^ CONFIG.SECURITY.SALT);
         this.#globalTime = 0;
         this.#moveTimer = 0;
         this.#spawnTimer = 0;
+        this.#difficulty = 1.0;
+        this.#shake = 0;
 
         this.#input.reset();
 
@@ -111,13 +120,13 @@ export class GameEngine {
 
         this.#toggleOverlay(false);
         this.#updateHUD();
-        this.#announce("Game Started. Good Luck. Level 1.");
+        this.#announce("Game Started. Good Luck.");
 
-        // Focus Canvas for Keyboard Events
         const canvas = document.getElementById('gameCanvas');
         if (canvas) canvas.focus();
 
         this.#lastTime = performance.now();
+        AUDIO.playCollect(); // Startup sound
     }
 
     togglePause() {
@@ -131,7 +140,6 @@ export class GameEngine {
             this.#toggleOverlay(false);
             this.#announce("Resuming Game");
             this.#lastTime = performance.now();
-
             const canvas = document.getElementById('gameCanvas');
             if (canvas) canvas.focus();
         }
@@ -155,7 +163,9 @@ export class GameEngine {
         this.#toggleOverlay(true);
         this.#announce(msg);
 
-        // Focus Start Button for easy restart
+        AUDIO.playCrash();
+        this.#shake = 20; // Big shake
+
         const btn = document.getElementById('start-btn');
         if (btn) btn.focus();
     }
@@ -205,12 +215,31 @@ export class GameEngine {
             this.#update(dt);
         }
 
+        // Always update particles for juice (even during death animation if we had one)
+        this.#particles.update(dt);
+
+        // Shake Decay
+        if (this.#shake > 0) {
+            this.#shake -= dt * 30;
+            if (this.#shake < 0) this.#shake = 0;
+        }
+
+        // Score Lerp
+        if (this.#displayScore < this.#score) {
+            this.#displayScore += (this.#score - this.#displayScore) * 5 * dt;
+            if (this.#displayScore > this.#score - 1) this.#displayScore = this.#score;
+            this.#updateHUD();
+        }
+
         this.#draw();
         requestAnimationFrame((t) => this.#loop(t));
     }
 
     #update(dt) {
         this.#globalTime += dt;
+
+        // Difficulty Scaling: 1 + (Time/60)^1.2
+        this.#difficulty = 1.0 + Math.pow(this.#globalTime / 60, CONFIG.GAMEPLAY.DIFFICULTY_EXP);
 
         let cmd = this.#input.pop();
         if (cmd) {
@@ -219,8 +248,8 @@ export class GameEngine {
         }
 
         this.#moveTimer += dt;
-        if (this.#moveTimer >= CONFIG.GAMEPLAY.SPEED_PLAYER) {
-            this.#moveTimer -= CONFIG.GAMEPLAY.SPEED_PLAYER;
+        if (this.#moveTimer >= CONFIG.GAMEPLAY.baseSpeedPlayer) { // Player speed constant for control
+            this.#moveTimer -= CONFIG.GAMEPLAY.baseSpeedPlayer;
 
             this.#player.tick();
 
@@ -234,12 +263,18 @@ export class GameEngine {
             if (p.x === this.#fragment.x && p.y === this.#fragment.y) {
                 this.#addScore(CONFIG.GAMEPLAY.SCORE_VAL);
                 p.len += 1;
+
+                // Juice
+                this.#shake = 5;
+                this.#particles.emit(this.#fragment.x, this.#fragment.y, CONFIG.COLORS.FRAGMENT, 15);
+                AUDIO.playCollect();
+
                 this.#spawnFragment();
-                this.#updateHUD();
             }
         }
 
-        const enemyDist = CONFIG.GAMEPLAY.SPEED_ENEMY * dt;
+        const enemySpeed = CONFIG.GAMEPLAY.baseSpeedEnemy * this.#difficulty;
+        const enemyDist = enemySpeed * dt;
         const pX = this.#player.x;
         const pY = this.#player.y;
 
@@ -259,21 +294,29 @@ export class GameEngine {
             }
         }
 
+        // Spawn Rate Increases with Difficulty
+        const currentRate = CONFIG.GAMEPLAY.baseSpawnRate / this.#difficulty;
         this.#spawnTimer += dt;
-        if (this.#spawnTimer >= CONFIG.GAMEPLAY.SPAWN_RATE) {
+        if (this.#spawnTimer >= currentRate) {
             this.#spawnTimer = 0;
             this.#spawnEnemy();
         }
     }
 
     #draw() {
+        // Shake Offset
+        const sx = (Math.random() - 0.5) * this.#shake;
+        const sy = (Math.random() - 0.5) * this.#shake;
+
         const ren = this.#renderer;
-        ren.clear();
+        ren.clear(sx, sy);
 
         if (this.#fragment.active) {
             const pulse = this.#globalTime * 5;
             ren.drawEntity(this.#fragment.x, this.#fragment.y, CONFIG.COLORS.FRAGMENT, 'circle', pulse);
         }
+
+        this.#particles.draw(ren.ctx, CONFIG.GRID.TILE);
 
         for (let t of this.#player.tail) {
             ren.drawEntity(t.x, t.y, CONFIG.COLORS.PLAYER, 'rect');
@@ -283,13 +326,19 @@ export class GameEngine {
         for (let e of this.#enemies) {
             ren.drawEntity(e.x, e.y, CONFIG.COLORS.ENEMY, 'rect');
         }
+
+        ren.restore();
     }
 
     #updateHUD() {
-        const scoreEl = document.getElementById('score-val');
-        const highEl = document.getElementById('high-score-val');
-        if (scoreEl) scoreEl.innerText = this.#score;
-        if (highEl) highEl.innerText = this.#highScore;
+        const sEl = document.getElementById('score-val');
+        if (sEl) sEl.innerText = Math.floor(this.#displayScore);
+
+        const hEl = document.getElementById('high-score-val');
+        if (hEl) hEl.innerText = this.#highScore;
+
+        const fEl = document.getElementById('fps-display');
+        if (fEl) fEl.innerText = `DIF: x${this.#difficulty.toFixed(1)}`;
     }
 
     #toggleOverlay(visible, showBtn = true) {

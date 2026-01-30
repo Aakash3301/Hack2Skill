@@ -18,10 +18,17 @@ export class Renderer {
         canvas.height = this.#config.H * this.#config.TILE;
     }
 
-    clear() {
-        this.#ctx.fillStyle = CONFIG.COLORS.BG;
-        this.#ctx.fillRect(0, 0, this.#ctx.canvas.width, this.#ctx.canvas.height);
+    get ctx() { return this.#ctx; }
 
+
+    clear(shakeX = 0, shakeY = 0) {
+        this.#ctx.save();
+        this.#ctx.translate(shakeX, shakeY);
+
+        this.#ctx.fillStyle = CONFIG.COLORS.BG;
+        this.#ctx.fillRect(-shakeX, -shakeY, this.#ctx.canvas.width, this.#ctx.canvas.height);
+
+        // Grid
         this.#ctx.strokeStyle = CONFIG.COLORS.GRID;
         this.#ctx.lineWidth = 1;
         this.#ctx.beginPath();
@@ -32,6 +39,14 @@ export class Renderer {
         for (let x = 0; x <= w; x += t) { this.#ctx.moveTo(x, 0); this.#ctx.lineTo(x, h); }
         for (let y = 0; y <= h; y += t) { this.#ctx.moveTo(0, y); this.#ctx.lineTo(w, y); }
         this.#ctx.stroke();
+    }
+
+    restore() {
+        this.#ctx.restore();
+    }
+
+    drawParticles(system) {
+        system.draw(this.#ctx, this.#config.TILE);
     }
 
     drawEntity(x, y, color, shape = 'rect', pulse = 0) {

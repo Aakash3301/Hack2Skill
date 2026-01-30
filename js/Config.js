@@ -13,7 +13,8 @@ export const CONFIG = Object.freeze({
         GRID: '#1a1a2e',
         PLAYER: '#00ffcc',
         FRAGMENT: '#ff00ff',
-        ENEMY: '#ff3333'
+        ENEMY: '#ff3333',
+        PARTICLE: '#ffffff'
     }),
     INPUT: Object.freeze({
         KEYS: {
@@ -23,16 +24,27 @@ export const CONFIG = Object.freeze({
             RIGHT: ['ArrowRight', 'KeyD'],
             PAUSE: ['Escape', 'Space']
         },
-        THROTTLE_MS: 50 // Input debouncing
+        THROTTLE_MS: 50,
+        SWIPE_THRESHOLD: 30 // Mobile Swipe Distance
     }),
     GAMEPLAY: Object.freeze({
-        SPEED_PLAYER: 0.08, // Move interval (s)
-        SPEED_ENEMY: 5.0, // Grid units per second
-        SPAWN_RATE: 3.5,
+        baseSpeedPlayer: 0.08,
+        baseSpeedEnemy: 5.0,
+        baseSpawnRate: 3.5,
         SCORE_VAL: 100,
-        MAX_DT: 0.1 // Anti-lag/cheat clamp
+        MAX_DT: 0.1,
+        DIFFICULTY_EXP: 1.2 // Power function exponent
     }),
     SECURITY: Object.freeze({
-        SALT: 0xDEADBEEF // Simple Obfuscation Salt
+        SALT: 0xDEADBEEF,
+        STORAGE_KEY: 'egs_secure_v1',
+        SECRET: 'HACK2SKILL_SECURE_2026' // For HMAC
+    }),
+    AUDIO: Object.freeze({
+        ENABLED: true,
+        VOL_MASTER: 0.3
+    }),
+    PARTICLES: Object.freeze({
+        COUNT: 500
     })
 });

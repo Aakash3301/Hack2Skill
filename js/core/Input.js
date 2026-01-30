@@ -21,6 +21,19 @@ export class InputSystem {
         };
 
         window.addEventListener('keydown', (e) => this.#onKeyDown(e));
+
+        // Touch Support
+        let tsX, tsY;
+        window.addEventListener('touchstart', (e) => {
+            tsX = e.touches[0].clientX;
+            tsY = e.touches[0].clientY;
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+            const teX = e.changedTouches[0].clientX;
+            const teY = e.changedTouches[0].clientY;
+            this.#handleSwipe(tsX, tsY, teX, teY);
+        }, { passive: false });
     }
 
     #onKeyDown(e) {
@@ -40,6 +53,25 @@ export class InputSystem {
         else if (CONFIG.INPUT.KEYS.LEFT.includes(code)) cmd = this.#commands.LEFT;
         else if (CONFIG.INPUT.KEYS.RIGHT.includes(code)) cmd = this.#commands.RIGHT;
         else if (CONFIG.INPUT.KEYS.PAUSE.includes(code)) cmd = this.#commands.PAUSE;
+
+        if (cmd) this.#queue.push(cmd);
+    }
+
+    #handleSwipe(xs, ys, xe, ye) {
+        const dx = xe - xs;
+        const dy = ye - ys;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+        const limit = CONFIG.INPUT.SWIPE_THRESHOLD;
+
+        let cmd = null;
+        if (absX > absY && absX > limit) {
+            cmd = dx > 0 ? this.#commands.RIGHT : this.#commands.LEFT;
+        } else if (absY > absX && absY > limit) {
+            cmd = dy > 0 ? this.#commands.DOWN : this.#commands.UP;
+        } else if (absX < limit && absY < limit) {
+            // Tap - maybe pause or interact?
+        }
 
         if (cmd) this.#queue.push(cmd);
     }
