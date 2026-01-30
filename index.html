@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Endless Grid Survival [A11Y-READY]</title>
+    <style>
+        :root {
+            --bg-color: #050510;
+            --grid-color: #1a1a2e;
+            --player-color: #00ffcc;
+            --fragment-color: #ff00ff;
+            --enemy-color: #ff3333;
+            --text-color: #f0f0f0;
+            /* Increased contrast from #e0e0e0 */
+            --overlay-bg: rgba(5, 5, 16, 0.98);
+            --font-main: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-main);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        /* Responsive Scaling Container */
+        main {
+            position: relative;
+            box-shadow: 0 0 40px rgba(0, 255, 204, 0.15);
+            border: 2px solid var(--grid-color);
+            /* Thicker border for better visibility */
+        }
+
+        canvas {
+            display: block;
+            background-color: var(--bg-color);
+            touch-action: none;
+            /* Improve touch accessibility */
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            z-index: 5;
+        }
+
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .hud-text {
+            font-size: 1.5rem;
+            /* Larger Text */
+            text-shadow: 0 0 5px currentColor;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        #score-val {
+            color: var(--player-color);
+        }
+
+        #high-score-val {
+            color: var(--fragment-color);
+        }
+
+        .secure-badge {
+            color: #00ff00;
+            font-size: 1rem;
+            /* Readable Size */
+            opacity: 0.9;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 5px;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--overlay-bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            pointer-events: auto;
+            z-index: 10;
+            transition: opacity 0.2s ease;
+        }
+
+        .hidden {
+            display: none !important;
+            /* Force hide for a11y focus */
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 5px;
+            color: var(--player-color);
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            text-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            color: var(--enemy-color);
+            margin-bottom: 25px;
+            letter-spacing: 2px;
+        }
+
+        .btn {
+            margin-top: 20px;
+            padding: 14px 40px;
+            font-size: 1.5rem;
+            font-family: var(--font-main);
+            background: #000;
+            /* Solid background for contrast */
+            color: var(--player-color);
+            border: 3px solid var(--player-color);
+            /* Thicker border */
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .btn:hover,
+        .btn:focus {
+            background: var(--player-color);
+            color: #000;
+            box-shadow: 0 0 25px var(--player-color);
+            outline: none;
+        }
+
+        /* Accessibility Focus Indicators */
+        :focus-visible {
+            outline: 4px solid #fff;
+            outline-offset: 4px;
+        }
+
+        .controls-hint {
+            margin-top: 30px;
+            font-size: 1rem;
+            color: #ccc;
+            /* Better contrast */
+            border-top: 1px solid #666;
+            padding-top: 15px;
+            line-height: 1.6;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="sr-only">
+        <h1>Endless Grid Survival Game</h1>
+    </header>
+
+    <main id="game-container" role="application" aria-label="Game Area">
+        <canvas id="gameCanvas" aria-label="Game Viewport. Use Arrow keys to move."></canvas>
+
+        <div id="ui-layer" aria-hidden="true"> <!-- Visual only -->
+            <div class="hud-row">
+                <div class="hud-text">DATA: <span id="score-val">0</span></div>
+                <div class="hud-text">HIGH: <span id="high-score-val">0</span></div>
+            </div>
+            <div class="hud-row" style="margin-top: auto;">
+                <div class="secure-badge">SECURE KERNEL: ACTIVE</div>
+                <div class="secure-badge" id="fps-display">30</div> <!-- Placeholder -->
+            </div>
+        </div>
+
+        <!-- Live Region for Screen Readers -->
+        <div id="a11y-status" class="sr-only" aria-live="polite" aria-atomic="true">
+            Game Ready. Press Start Button to begin.
+        </div>
+
+        <section id="overlay" aria-labelledby="title-text" aria-describedby="status-text">
+            <h1 id="title-text">GRID::SURVIVAL</h1>
+            <h2 id="status-text">SYSTEM READY</h2>
+            <button id="start-btn" class="btn">INITIALIZE</button>
+            <div class="controls-hint">
+                <p>[WASD/ARROWS] NAVIGATE</p>
+                <p>[SPACE/ESC] PAUSE</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="sr-only">
+        <p>Copyright 2026. Accessible Gaming Initiative.</p>
+    </footer>
+
+    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/TestRunner.js"></script> <!-- Inject Test Runner -->
+</body>
+
+</html>

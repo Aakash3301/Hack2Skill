@@ -1,0 +1,36 @@
+# Systems
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Node / Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# IDE / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.project
+.settings/
+.classpath
+
+# Build / Dist
+dist/
+build/
+coverage/
+
+# Misc
+*.log
+*.local
+tmp/
+temp/
+.env
+
+# Testing
+# js/TestRunner.js # Untag this if you want to commit the test runner
