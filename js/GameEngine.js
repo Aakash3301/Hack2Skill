@@ -57,14 +57,14 @@ export class GameEngine {
         requestAnimationFrame((t) => this.#loop(t));
 
         console.log("[SYSTEM] GameEngine Initialized (Polished)");
-        AUDIO.init(); // Try init audio context
+        try { AUDIO.init(); } catch (e) { console.warn("Audio Init failed (Autoplay policy?):", e); }
     }
 
     #bindUI() {
         const startBtn = document.getElementById('start-btn');
         if (startBtn) {
             startBtn.onclick = () => {
-                AUDIO.init();
+                try { AUDIO.init(); } catch (e) { }
                 this.start();
             };
             // Touch handler for mobile start
